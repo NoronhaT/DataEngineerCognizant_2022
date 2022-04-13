@@ -1,0 +1,235 @@
+from __future__ import unicode_literals
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup as soup
+from operator import itemgetter
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import wikipedia
+import webbrowser
+import os
+import time
+import subprocess
+import wolframalpha
+import json
+import requests
+import pandas as pd
+
+# PARAMETROS:
+
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+wikipedia.set_lang("pt")
+
+# FIX para o Spacy error
+# from spacy.cli import download
+# download("en_core_web_sm")
+class ENGSM:
+    ISO_639_1 = 'en_core_web_sm'
+
+
+# parametros de voz
+engine = pyttsx3.init('sapi5')
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[0].id)
+
+
+#variáveis de ação
+
+buscar_youtube =[]
+
+
+
+
+# função falar
+def speak(texto):
+    engine.say(texto)
+    engine.runAndWait()
+
+
+# função ouvir comando do usuário
+def ouvir_microfone():
+    # Habilita o microfone do usuário
+    microfone = sr.Recognizer()
+    # usando o microfone
+    with sr.Microphone() as source:
+        # Chama um algoritmo de reducao de ruidos no som
+        microfone.adjust_for_ambient_noise(source)
+        # Frase para o usuario dizer algo
+        print("Diga alguma coisa ")
+        # Armazena o que foi dito numa variavel
+        audio = microfone.listen(source)
+    try:
+        # Passa a variável para o algoritmo reconhecedor de padroes
+        frase = microfone.recognize_google(audio, language='pt-BR')
+        # Retorna a frase pronunciada
+        print("Você disse: " + frase)
+
+    # Se nao reconheceu o padrao de fala, exibe a mensagem
+    except sr.UnkownValueError:
+        print("Não entendi")
+        speak("Não te entendi")
+
+    return frase
+
+
+def boas_vindas():
+    hour = datetime.datetime.now().hour
+    if hour >= 0 and hour < 12:
+        speak("Olá, um ótimo dia!")
+        print("Olá, um ótimo dia!")
+    elif hour >= 12 and hour < 18:
+        speak("Boa tarde!")
+        print("Boa tarde!")
+    else:
+        speak("Oi, boa noite")
+        print("Oi, boa noite")
+
+
+speak('Carregando sua assistente pessoal')
+print('Carregando sua assistente pessoal')
+
+
+try:
+    # tenta carregar o nome se existir
+    nome = pd.read_excel('nome.xlsx')
+    nome_df = pd.DataFrame(nome)
+    nome_bot = nome_df['nome'][0]
+    boas_vindas()
+    speak("Olá meu nome é" + str(nome_bot))
+
+except:
+
+    # dá um nome para a assitente
+    first_run = speak("Olá! Diga qual nome você quer dar para mim ")
+    print("Olá! Diga qual nome você quer dar para mim ")
+    ia_name = [ouvir_microfone()]
+    my_name = speak("O nome que você escolheu para mim foi " + str(ia_name))
+
+    # armazena o nome em um DF e xlsx
+    name_str = {'nome': [str(ia_name)]}
+    name_df = pd.DataFrame(name_str)
+    name_xlsx = name_df.to_excel('nome.xlsx')
+
+
+
+def busca_youtube():
+    driver.get("https://www.youtube.com")
+    driver.find_element(By.XPATH, '//*[@id="search-input"]').click()
+    time.sleep(3)
+    driver.find_element(By.XPATH,
+                                    '/html/body/ytd-app/div[1]/div/ytd-masthead/div[3]/div[2]/ytd-searchbox/form/div[1]/div[1]/div/div[2]/input').send_keys(buscar_youtube)
+    driver.find_element(By.XPATH,
+                                   '/html/body/ytd-app/div[1]/div/ytd-masthead/div[3]/div[2]/ytd-searchbox/button').send_keys(
+        Keys.ENTER)
+
+    time.sleep(10)
+
+    first_video = driver.find_element(By.XPATH,
+                                      '/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]')
+    html_content = first_video.get_attribute('outerHTML')
+    b_soup = soup(html_content, 'html.parser')
+    first_link = []
+
+    for a in b_soup.find_all('a', href=True):
+        link = (a['href'])
+        if "watch" in link:
+            first_link = link
+            continue
+
+    driver.get("https://www.youtube.com" + first_link)
+
+    time.sleep(30)
+
+    time_video = driver.find_element(By.XPATH, '/html/body/ytd-app/div[1]')
+    html_content = time_video.get_attribute('outerHTML')
+    b_soup = soup(html_content, 'html.parser')
+
+    valor_um=[]
+    valor_dois=[]
+    valor_tres=[]
+
+    for a in b_soup.find_all('span', class_='ytp-time-duration'):
+        valor_tempo = a.get_text()
+        valor_corr = valor_tempo.split(':')
+
+
+        if len(valor_corr) == 3:
+            valor_um = itemgetter(0)(valor_corr)
+            valor_dois = itemgetter(1)(valor_corr)
+            valor_tres = itemgetter(2)(valor_corr)
+
+        elif len(valor_corr) == 2:
+            valor_um = itemgetter(1)(valor_corr)
+            valor_dois = itemgetter(0)(valor_corr)
+
+        elif len(valor_corr) == 1:
+            valor_um = 60
+
+        print(valor_corr)
+
+    tempo_espera = itemgetter(0)(valor_dois)
+    print("Tempo estimao de duração do video :",int(tempo_espera)," minutos.")
+    time.sleep(int(tempo_espera)*60)
+
+
+
+# ações
+if __name__ == '__main__':
+    while True:
+        speak("Me diga em que posso te ajudar?")
+        statement = ouvir_microfone().lower()
+
+        if "tchau" in statement or "encerrar" in statement or "sair" in statement:
+            speak('Vou encerrar o programa, até logo')
+            print('Vou encerrar o programa, até logo')
+            break
+
+        elif "o que" in statement and "você" in statement and "pode" in statement and "fazer" in statement:
+            speak('Até o momento, você pode definir meu nome, buscar sobre alguma coisa no wikipedia, zoar um palmeirense ou dizer sair para encerrar o programa')
+
+        elif "e" in statement and "o" in statement and "palmeiras" in statement:
+            speak('O Palmeiras não tem Mundial. Ah sim, olha só o que eu encontrei aqui')
+            webbrowser.open('https://www.youtube.com/watch?v=K3CLtQqSC0Y')
+            time.sleep(15)
+            os.system("taskkill /im chrome.exe /f")
+            speak('Me desculpem os palmeirenses kkkkk')
+
+        elif "procure" in statement or "busque" in statement and "por" in statement and "wikipedia":
+            speak('Vou procurar sua solicitação no wikipedia, por favor aguarde')
+            wik_dict = {"procure": "", "busque": "", "por": "", "wikipédia": "", "no": ""}
+            stat_proc = statement.replace("procure","")
+            stat_bus = stat_proc.replace("busque","")
+            stat_por = stat_bus.replace("por","")
+            stat_wik = stat_por.replace("wikipédia","")
+            stat_no = stat_wik.replace("no"," ")
+
+            resultados = wikipedia.summary(stat_no)
+            
+            speak("Aqui está o resultado de sua busca")
+            print(resultados)
+            time.sleep(5)
+            speak(resultados)
+            time.sleep(10)
+
+        elif "procure" in statement or "busque" in statement and "por" in statement and "youtube" or "toque":
+            speak('Vou procurar sua solicitação no youtube, por favor aguarde')
+            stat_proc = statement.replace("procure", "")
+            stat_bus = stat_proc.replace("busque", "")
+            stat_por = stat_bus.replace("por", "")
+            stat_wik = stat_por.replace("youtube", "")
+            stat_toque = stat_wik.replace("no", "")
+            stat_no =stat_toque.replace("toque","")
+            speak('Abrindo o Youtube')
+            buscar_youtube = stat_no
+            busca_youtube()
